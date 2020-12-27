@@ -1,13 +1,17 @@
 package com.rn.keyboard
 
-import android.util.Log
 import android.view.WindowManager.LayoutParams
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
 
 @Suppress("unused")
-class RNKeyboardModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext) {
+class RNKeyboardModule(private val reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext), LifecycleEventListener {
     private var keyboardProvider: KeyboardProvider? = null
+    private var isInitialized: Boolean = false
+
+    init {
+        reactContext.addLifecycleEventListener(this)
+    }
 
     @ReactMethod
     fun setWindowSoftInputMode(mode: Int, promise: Promise) {
@@ -26,13 +30,14 @@ class RNKeyboardModule(private val reactContext: ReactApplicationContext) : Reac
         try {
             UiThreadUtil.runOnUiThread {
                 val mActivity = currentActivity
-                if(mActivity != null) {
+                if (mActivity != null) {
                     keyboardProvider = KeyboardProvider(mActivity)
-                    keyboardProvider?.addKeyboardListener(object : KeyboardProvider.KeyboardListener{
+                    keyboardProvider?.addKeyboardListener(object : KeyboardProvider.KeyboardListener {
                         override fun onHeightChanged(height: Int) {
                             emit(height)
                         }
                     })
+                    isInitialized = true
                 }
             }
         } catch (e: Exception) {
@@ -43,7 +48,7 @@ class RNKeyboardModule(private val reactContext: ReactApplicationContext) : Reac
     @ReactMethod
     fun stopKeyboardListener() {
         try {
-            keyboardProvider?.removeKeyboardListener();
+            keyboardProvider?.removeKeyboardListener()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -82,4 +87,17 @@ class RNKeyboardModule(private val reactContext: ReactApplicationContext) : Reac
         return constants;
     }
 
+    override fun onHostResume() {
+        if (isInitialized && keyboardProvider == null) {
+            startKeyboardListener()
+        }
+    }
+
+    override fun onHostPause() {
+    }
+
+    override fun onHostDestroy() {
+        keyboardProvider?.dismiss()
+        keyboardProvider = null
+    }
 }
